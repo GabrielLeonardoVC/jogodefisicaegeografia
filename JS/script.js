@@ -415,6 +415,7 @@ function desenharPlacar() {
         <span>limpa: <b>${g.limpa}</b></span>
         <span>convencional: <b>${g.convencional}</b></span>
         <span>impacto: <b>${g.impacto}</b></span>
+        <span>pontos agora: <b>${pontuarGrupo(g)}</b></span>
       </div>`;
         placar.appendChild(linha);
     });
@@ -506,12 +507,7 @@ function abrirCarta(tipo) {
 
     if (tipo === 'sorte') {
         const c = sorteia(BARALHOS.sorte);
-        const ef = { ...c.ef };
-        if (temBonus) {
-            if (ef.impacto > 0) ef.impacto = Math.max(0, ef.impacto - 1);
-            if (ef.limpa > 0) ef.limpa += 1;
-            if (ef.limpa < 0) ef.limpa = Math.min(0, ef.limpa + 1);
-        }
+        const ef = temBonus ? aplicarBonusPersonagem({ ...c.ef }) : { ...c.ef };
         const tags = [];
         if (ef.limpa) tags.push(`<span class="tag-efeito">${ef.limpa > 0 ? '+' : ''}${ef.limpa} limpa</span>`);
         if (ef.convencional) tags.push(`<span class="tag-efeito">${ef.convencional > 0 ? '+' : ''}${ef.convencional} convencional</span>`);
@@ -572,23 +568,35 @@ function responder(i) {
     modal.appendChild(bloco);
 }
 
+// --- pontuação simplificada ---
+// regra única: acertar sempre soma energia, errar nunca soma (só as cartas de
+// "não renovável" e "impacto" é que mexem no medidor de impacto, pra sobrar
+// só uma coisa nova pra lembrar por vez.
 function calcularEfeito(tipo, acertou, bonus) {
-    let d;
+    let d = { limpa: 0, convencional: 0, impacto: 0 };
+
     if (tipo === 'renovavel') {
-        d = { limpa: acertou ? 3 : 1, convencional: 0, impacto: 0 };
-        if (bonus) d.limpa += 1;
+        if (acertou) d.limpa = 2;
     } else if (tipo === 'naorenovavel') {
-        d = acertou ? { limpa: 0, convencional: 2, impacto: 1 } : { limpa: 0, convencional: 1, impacto: 2 };
-        if (bonus) d.impacto = Math.max(0, d.impacto - 1);
+        if (acertou) { d.convencional = 2; d.impacto = 1; }
+        else { d.impacto = 2; }
     } else if (tipo === 'transformacao') {
-        d = acertou ? { limpa: 2, convencional: 1, impacto: 0 } : { limpa: 0, convencional: 0, impacto: 1 };
-        if (bonus) { if (acertou) d.limpa += 1; else d.impacto = Math.max(0, d.impacto - 1); }
+        if (acertou) d.limpa = 2;
     } else if (tipo === 'impacto') {
-        d = acertou ? { limpa: 2, convencional: 0, impacto: -2 } : { limpa: 0, convencional: 0, impacto: 3 };
-        if (bonus) { if (acertou) d.impacto -= 1; else d.impacto = Math.max(0, d.impacto - 1); }
-    } else {
-        d = { limpa: 0, convencional: 0, impacto: 0 };
+        d.impacto = acertou ? -2 : 2;
     }
+
+    if (bonus) d = aplicarBonusPersonagem(d);
+    return d;
+}
+
+// o personagem sempre deixa o resultado 1 ponto melhor pro grupo dele —
+// não importa se a carta foi bem ou mal, é só essa uma regra pra lembrar.
+function aplicarBonusPersonagem(d) {
+    if (d.limpa > 0) d.limpa += 1;
+    if (d.convencional > 0) d.convencional += 1;
+    if (d.impacto > 0) d.impacto = Math.max(0, d.impacto - 1);
+    if (d.impacto < 0) d.impacto -= 1;
     return d;
 }
 
@@ -606,6 +614,12 @@ function aplicarEfeito(d) {
     g.convencional = Math.max(0, g.convencional + (d.convencional || 0));
     g.impacto = Math.max(0, g.impacto + (d.impacto || 0));
     desenharPlacar();
+}
+
+// pontuação final = energia limpa vale o dobro, convencional vale o normal,
+// e cada ponto de impacto tira 1 do total. só isso.
+function pontuarGrupo(g) {
+    return (g.limpa * 2) + g.convencional - g.impacto;
 }
 
 function resolverSemPergunta(efeito) {
@@ -644,7 +658,7 @@ function passarVez() {
 
 function encerrarJogo() {
     const resultado = jogo.grupos
-        .map(g => ({ ...g, pontos: (g.limpa * 3) + (g.convencional * 1) - (g.impacto * 2) }))
+        .map(g => ({ ...g, pontos: pontuarGrupo(g) }))
         .sort((a, b) => b.pontos - a.pontos);
 
     const ranking = document.getElementById('ranking');
