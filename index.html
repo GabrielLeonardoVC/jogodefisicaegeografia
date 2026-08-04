@@ -1,208 +1,993 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>Vilanova no Escuro — jogo de tabuleiro sobre energia</title>
-  <link rel="stylesheet" href="/CSS/style.css">
-  <script src="/JS/script.js" defer></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link
-    href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Nunito:wght@400;600;700;800&display=swap"
-    rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rota da Energia — Construindo a Matriz do Futuro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg-deep:#0a1c2b;
+  --bg-panel:#0f2739;
+  --bg-panel-2:#132f45;
+  --line:#1c3d54;
+  --text:#e8f1f6;
+  --text-dim:#8fa9b8;
+  --hidro:#2e86ab;
+  --solar:#f4b93e;
+  --eolica:#4fd1a5;
+  --biomassa:#7cb342;
+  --fossil:#c25454;
+  --nuclear:#9b6fb3;
+  --impacto-c:#e2683f;
+  --sorte-c:#d9b3ff;
+  --estacao-c:#4fd1a5;
+  --transf-c:#f4b93e;
+  --renov-c:#2e86ab;
+  --naorenov-c:#c25454;
+  --good:#5fd39a;
+  --bad:#e2683f;
+  --radius:14px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:radial-gradient(ellipse at 20% 0%, #123249 0%, var(--bg-deep) 55%);
+  color:var(--text);
+  font-family:'Inter',sans-serif;
+  min-height:100vh;
+  line-height:1.5;
+}
+.mono{font-family:'JetBrains Mono',monospace;}
+h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
+.wrap{
+  max-width:980px;
+  margin:0 auto;
+  padding:28px 20px 60px;
+}
+.screen{display:none;}
+.screen.active{display:block; animation:fadein .35s ease;}
+@keyframes fadein{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);}}
+
+/* ---------- shared bits ---------- */
+.eyebrow{
+  font-family:'JetBrains Mono',monospace;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  font-size:12px;
+  color:var(--solar);
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:10px;
+}
+.eyebrow::before{content:"";width:18px;height:2px;background:var(--solar);display:inline-block;}
+.btn{
+  font-family:'Space Grotesk',sans-serif;
+  font-weight:600;
+  font-size:15px;
+  border:none;
+  border-radius:10px;
+  padding:13px 22px;
+  cursor:pointer;
+  transition:transform .15s ease, box-shadow .15s ease, background .15s ease;
+  color:#08161f;
+  background:linear-gradient(135deg,var(--solar),#f7d27c);
+}
+.btn:hover{transform:translateY(-2px); box-shadow:0 8px 20px -6px rgba(244,185,62,.5);}
+.btn:active{transform:translateY(0);}
+.btn.secondary{
+  background:transparent;
+  color:var(--text);
+  border:1px solid var(--line);
+}
+.btn.secondary:hover{box-shadow:none; border-color:var(--eolica); color:var(--eolica);}
+.btn:disabled{opacity:.4; cursor:not-allowed; transform:none; box-shadow:none;}
+.row{display:flex; gap:12px; flex-wrap:wrap;}
+.card-panel{
+  background:linear-gradient(160deg,var(--bg-panel),var(--bg-panel-2));
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:22px;
+}
+.pill{
+  display:inline-block;
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;
+  padding:3px 10px;
+  border-radius:100px;
+  letter-spacing:.05em;
+}
+
+/* ---------- intro ---------- */
+.hero{
+  border-radius:20px;
+  padding:44px 34px;
+  position:relative;
+  overflow:hidden;
+  background:
+    radial-gradient(circle at 85% 20%, rgba(79,209,165,.18), transparent 45%),
+    radial-gradient(circle at 10% 90%, rgba(244,185,62,.15), transparent 45%),
+    linear-gradient(160deg,var(--bg-panel),var(--bg-panel-2));
+  border:1px solid var(--line);
+}
+.hero h1{
+  font-size:clamp(30px,5vw,46px);
+  margin:0 0 12px;
+  line-height:1.05;
+}
+.hero .accent{color:var(--solar);}
+.hero p.lead{color:var(--text-dim); font-size:16px; max-width:560px; margin:0 0 26px;}
+.trace-deco{
+  position:absolute; right:-40px; top:-40px; width:260px; height:260px; opacity:.5;
+  pointer-events:none;
+}
+.chip-row{display:flex; gap:10px; flex-wrap:wrap; margin:24px 0 30px;}
+.chip{
+  font-family:'JetBrains Mono',monospace;
+  font-size:12px;
+  padding:6px 12px;
+  border-radius:100px;
+  border:1px solid var(--line);
+  color:var(--text-dim);
+}
+.chip b{color:var(--text); font-weight:600;}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%; margin-right:6px;}
+
+/* ---------- rules ---------- */
+.rules-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin:20px 0;}
+.tile-legend{
+  border:1px solid var(--line); border-radius:12px; padding:14px 16px; background:rgba(255,255,255,.02);
+}
+.tile-legend h4{margin:0 0 6px; font-size:14px; display:flex; align-items:center; gap:8px;}
+.tile-legend p{margin:0; font-size:13px; color:var(--text-dim);}
+ol.steps{padding-left:20px; color:var(--text-dim);}
+ol.steps li{margin-bottom:8px;}
+ol.steps b{color:var(--text);}
+.formula{
+  font-family:'JetBrains Mono',monospace;
+  background:rgba(0,0,0,.25);
+  border:1px dashed var(--line);
+  border-radius:10px;
+  padding:14px 16px;
+  font-size:13.5px;
+  color:var(--eolica);
+  margin:10px 0;
+}
+
+/* ---------- setup ---------- */
+.setup-team{
+  display:flex; gap:10px; align-items:center; margin-bottom:10px;
+  background:rgba(255,255,255,.02); border:1px solid var(--line); border-radius:10px; padding:8px 10px;
+}
+.setup-team input[type=text]{
+  flex:1; background:transparent; border:none; color:var(--text); font-family:'Inter'; font-size:14px; outline:none;
+  border-bottom:1px solid var(--line); padding:6px 2px;
+}
+.color-swatch{width:22px;height:22px;border-radius:50%; flex-shrink:0; border:2px solid rgba(255,255,255,.3);}
+.count-toggle{display:flex; gap:8px; margin:10px 0 20px;}
+.count-toggle button{
+  padding:8px 16px; border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--text-dim);
+  cursor:pointer; font-family:'JetBrains Mono',monospace; font-size:13px;
+}
+.count-toggle button.sel{background:var(--solar); color:#08161f; border-color:var(--solar); font-weight:700;}
+
+/* ---------- game ---------- */
+.game-top{display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:18px;}
+.round-badge{font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text-dim);}
+.game-layout{display:grid; grid-template-columns:1fr; gap:20px;}
+@media(min-width:840px){ .game-layout{grid-template-columns:1.5fr 1fr;} }
+
+.board{
+  background:rgba(0,0,0,.2);
+  border:1px solid var(--line);
+  border-radius:16px;
+  padding:16px;
+}
+.board-row{display:flex; gap:8px; margin-bottom:8px;}
+.board-row.reverse{flex-direction:row-reverse;}
+.tile{
+  flex:1;
+  aspect-ratio:1/1;
+  border-radius:9px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  position:relative;
+  border:1px solid rgba(255,255,255,.08);
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px;
+  color:rgba(255,255,255,.75);
+  min-width:0;
+}
+.tile .idx{position:absolute; top:3px; left:5px; font-size:8px; opacity:.55;}
+.tile .ic{font-size:16px; line-height:1;}
+.tile.renovavel{background:rgba(46,134,171,.28); box-shadow:inset 0 0 0 1px rgba(46,134,171,.4);}
+.tile.naorenovavel{background:rgba(194,84,84,.25); box-shadow:inset 0 0 0 1px rgba(194,84,84,.4);}
+.tile.transformacao{background:rgba(244,185,62,.22); box-shadow:inset 0 0 0 1px rgba(244,185,62,.4);}
+.tile.impacto{background:rgba(226,104,63,.28); box-shadow:inset 0 0 0 1px rgba(226,104,63,.45);}
+.tile.estacao{background:rgba(79,209,165,.2); box-shadow:inset 0 0 0 1px rgba(79,209,165,.4);}
+.tile.sorte{background:rgba(217,179,255,.2); box-shadow:inset 0 0 0 1px rgba(217,179,255,.4);}
+.tokens{position:absolute; bottom:2px; display:flex; gap:2px; flex-wrap:wrap; justify-content:center;}
+.token{width:9px;height:9px;border-radius:50%; border:1px solid rgba(0,0,0,.4);}
+
+.side-panel{display:flex; flex-direction:column; gap:14px;}
+.turn-card{
+  background:linear-gradient(160deg,var(--bg-panel),var(--bg-panel-2));
+  border:1px solid var(--line); border-radius:14px; padding:18px;
+}
+.turn-team-name{font-family:'Space Grotesk'; font-size:20px; margin:2px 0 2px; display:flex; align-items:center; gap:8px;}
+.dice-area{display:flex; align-items:center; gap:16px; margin:14px 0;}
+.die{
+  width:52px; height:52px; border-radius:12px; background:#fff; color:#111;
+  display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:700;
+  font-family:'JetBrains Mono'; box-shadow:0 6px 16px rgba(0,0,0,.35);
+  transition:transform .5s cubic-bezier(.2,1.4,.4,1);
+}
+.die.rolling{animation:diceRoll .5s ease;}
+@keyframes diceRoll{ 0%{transform:rotate(0)} 50%{transform:rotate(200deg)} 100%{transform:rotate(360deg)} }
+
+.teams-scoreboard{display:flex; flex-direction:column; gap:10px;}
+.team-row{
+  background:rgba(255,255,255,.02); border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+}
+.team-row.current{border-color:var(--solar); box-shadow:0 0 0 1px var(--solar) inset;}
+.team-row-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
+.team-name-tag{display:flex; align-items:center; gap:7px; font-weight:600; font-size:13.5px;}
+.matrix-bar{height:8px; border-radius:100px; background:rgba(255,255,255,.06); overflow:hidden; display:flex;}
+.matrix-bar .seg-limpa{background:linear-gradient(90deg,var(--eolica),var(--hidro));}
+.matrix-bar .seg-conv{background:linear-gradient(90deg,var(--fossil),var(--naorenov-c));}
+.mini-stats{display:flex; gap:10px; font-family:'JetBrains Mono'; font-size:11px; color:var(--text-dim); margin-top:6px;}
+.mini-stats span b{color:var(--text);}
+
+.log{
+  max-height:150px; overflow-y:auto; font-size:12.5px; color:var(--text-dim); display:flex; flex-direction:column; gap:5px;
+  padding-right:4px;
+}
+.log div{border-left:2px solid var(--line); padding-left:8px;}
+
+/* ---------- modal (cards) ---------- */
+.modal-overlay{
+  position:fixed; inset:0; background:rgba(6,15,22,.78); backdrop-filter:blur(3px);
+  display:flex; align-items:center; justify-content:center; padding:20px; z-index:50;
+}
+.modal-overlay.hidden{display:none;}
+.modal-card{
+  max-width:560px; width:100%;
+  background:linear-gradient(160deg,var(--bg-panel),var(--bg-panel-2));
+  border:1px solid var(--line); border-radius:18px; padding:28px;
+  max-height:88vh; overflow-y:auto;
+}
+.modal-card h3{margin:6px 0 4px; font-size:21px;}
+.modal-tag{font-family:'JetBrains Mono'; font-size:11px; letter-spacing:.08em; text-transform:uppercase;}
+.opt-list{display:flex; flex-direction:column; gap:9px; margin:18px 0;}
+.opt{
+  text-align:left; padding:12px 14px; border-radius:10px; border:1px solid var(--line);
+  background:rgba(255,255,255,.02); color:var(--text); cursor:pointer; font-size:14px; font-family:'Inter';
+}
+.opt:hover{border-color:var(--solar);}
+.opt.correct{border-color:var(--good); background:rgba(95,211,154,.15);}
+.opt.wrong{border-color:var(--bad); background:rgba(226,104,63,.15);}
+.opt[disabled]{cursor:default;}
+.feedback{
+  margin-top:14px; padding:12px 14px; border-radius:10px; font-size:13.5px; display:none;
+}
+.feedback.show{display:block;}
+.feedback.ok{background:rgba(95,211,154,.12); border:1px solid var(--good); color:#d5f5e5;}
+.feedback.no{background:rgba(226,104,63,.12); border:1px solid var(--bad); color:#fbe0d5;}
+.fact-text{font-size:14.5px; color:var(--text-dim); line-height:1.6; margin:10px 0 18px;}
+.delta-tags{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;}
+.delta-tag{font-family:'JetBrains Mono'; font-size:11.5px; padding:3px 9px; border-radius:100px; border:1px solid var(--line);}
+
+/* ---------- end screen ---------- */
+.rank-row{
+  display:flex; align-items:center; gap:14px; padding:16px; border-radius:12px; margin-bottom:10px;
+  background:rgba(255,255,255,.02); border:1px solid var(--line);
+}
+.rank-row.winner{border-color:var(--solar); background:rgba(244,185,62,.08);}
+.rank-num{font-family:'Space Grotesk'; font-size:26px; color:var(--text-dim); width:34px;}
+.rank-row.winner .rank-num{color:var(--solar);}
+.rank-details{flex:1;}
+.rank-score{font-family:'JetBrains Mono'; font-size:20px; font-weight:700;}
+
+footer.credit{margin-top:36px; text-align:center; color:var(--text-dim); font-size:12px;}
+.icon-btn{
+  background:none; border:1px solid var(--line); color:var(--text-dim); border-radius:8px; padding:8px 12px;
+  cursor:pointer; font-size:13px; font-family:'JetBrains Mono';
+}
+.icon-btn:hover{color:var(--eolica); border-color:var(--eolica);}
+</style>
 </head>
-
 <body>
-  <div class="wrap">
+<div class="wrap">
 
-    <section id="tela-capa" class="screen active">
-      <div class="capa">
-        <span class="tag" style="margin-bottom:10px; display:inline-block;">Física + Geografia · jogo de
-          tabuleiro</span>
-        <h1>Vilanova <span>no Escuro</span></h1>
-        <p>A cidade de Vilanova apagou de vez. Sua equipe vai formar um dos grupos chamados para descobrir
-          como reconstruir a energia da cidade — explorando fontes renováveis e não renováveis, resolvendo
-          transformações de energia e lidando com os impactos de cada escolha no caminho.</p>
+  <!-- ============ INTRO ============ -->
+  <section id="screen-intro" class="screen active">
+    <div class="hero">
+      <div class="eyebrow">Física &amp; Geografia · jogo de tabuleiro digital</div>
+      <h1>Rota da <span class="accent">Energia</span><br>Construindo a matriz do futuro</h1>
+      <p class="lead">Cada equipe assume o papel de uma agência de planejamento energético.
+      Avancem pelo tabuleiro, explorem fontes renováveis e não renováveis, resolvam
+      transformações de energia e enfrentem dilemas ambientais — tudo isso para montar
+      a matriz energética mais equilibrada e sustentável antes do fim da partida.</p>
 
-        <div class="legenda-tipos">
-          <span class="tag">☀ Renovável</span>
-          <span class="tag">⛽ Não renovável</span>
-          <span class="tag">⚡ Transformação</span>
-          <span class="tag">⚠ Impacto</span>
-          <span class="tag">◈ Estação</span>
-          <span class="tag">★ Sorte</span>
-        </div>
-
-        <details class="historia">
-          <summary>ler a história</summary>
-          <p>Era uma sexta-feira comum em Vilanova até que, do nada: PLIM. A cidade inteira apagou ao mesmo tempo.
-            Ninguém soube explicar direito o motivo — será que esqueceram de pagar a conta de luz? — mas uma coisa
-            era certa: alguém tinha que resolver aquilo.</p>
-          <p>A prefeitura, meio desesperada, chamou seis grupos de gente que entende do assunto — professor,
-            cientista, curioso de plantão — para juntos descobrir como montar de novo a matriz de energia da cidade.
-            Cada grupo tem um líder com um jeito diferente de pensar sobre energia. Sua equipe é um desses grupos.
-            Rodada após rodada, vocês vão avançar pela cidade estudando fontes de energia, resolvendo transformações
-            e decidindo o que fazer diante de cada impacto ambiental. No fim, quem tiver montado a matriz mais
-            equilibrada ganha o direito de acender a luz de Vilanova de novo.</p>
-        </details>
-
-        <div class="row" style="margin-top:20px;">
-          <button class="btn" onclick="mudarTela('tela-setup')">Montar meu grupo</button>
-          <button class="btn outline" onclick="mudarTela('tela-regras')">Ver as regras</button>
-        </div>
-      </div>
-      <footer>de 2 a 6 grupos · 4 a 6 jogadores por grupo · dá pra jogar no celular, tablet ou computador</footer>
-    </section>
-
-    <section id="tela-regras" class="screen">
-      <h2>Como jogar</h2>
-      <div class="card">
-        <h3 style="margin-top:0;">Objetivo</h3>
-        <p style="color:var(--ink-soft);">Montar a matriz de energia do seu grupo combinando
-          <b style="color:var(--ink);">energia limpa</b>, <b style="color:var(--ink);">energia convencional</b> e
-          <b style="color:var(--ink);">impacto ambiental</b>. Ganha quem terminar com a maior pontuação —
-          priorizando energia limpa e evitando acumular impacto.
-        </p>
-
-        <h3>Passo a passo</h3>
-        <ol class="passos">
-          <li>Antes de começar, cada grupo escolhe um <b>personagem líder</b>, com uma especialidade.</li>
-          <li>Na sua vez, role o dado e ande pelo tabuleiro (ele é um circuito — ao completar a volta, continua
-            andando).</li>
-          <li>A casa em que você parar decide a carta que vem: pode ser pergunta, evento ou fato.</li>
-          <li>Responda ou decida o que a carta pede. Acertar rende mais energia limpa ou reduz impacto; errar custa
-            pontos.</li>
-          <li>Se a casa combinar com a especialidade do seu personagem, o grupo ganha um bônus.</li>
-          <li>O jogo acaba depois do número de rodadas escolhido na configuração.</li>
-          <li>No final, cada grupo mostra sua matriz e a pontuação é calculada.</li>
-        </ol>
-
-        <div class="formula">pontuação final = (energia limpa × 3) + (energia convencional × 1) − (impacto × 2)</div>
-        <p style="color:var(--ink-soft); font-size:13.5px;">Essa conta é uma forma simplificada de mostrar que
-          escolhas mais sustentáveis pesam mais — do mesmo jeito que, na vida real, uma matriz energética não é
-          avaliada só pela quantidade de energia gerada, mas também pelos impactos que ela causa.</p>
+      <div class="chip-row">
+        <span class="chip"><span class="dot" style="background:var(--hidro)"></span>Fontes renováveis</span>
+        <span class="chip"><span class="dot" style="background:var(--fossil)"></span>Fontes não renováveis</span>
+        <span class="chip"><span class="dot" style="background:var(--transf-c)"></span>Transformações de energia</span>
+        <span class="chip"><span class="dot" style="background:var(--impacto-c)"></span>Impactos ambientais</span>
+        <span class="chip"><span class="dot" style="background:var(--estacao-c)"></span>Estações informativas</span>
+        <span class="chip"><span class="dot" style="background:var(--sorte-c)"></span>Sorte / eventos</span>
       </div>
 
-      <h3>Tipos de casa</h3>
-      <div class="legenda-grid">
-        <div class="legenda-item">
-          <h4>☀ Fonte renovável</h4>
-          <p>Perguntas sobre hidrelétrica, solar, eólica e biomassa. Acertar: +3 energia limpa.</p>
-        </div>
-        <div class="legenda-item">
-          <h4>⛽ Fonte não renovável</h4>
-          <p>Perguntas sobre carvão, petróleo, gás natural e nuclear. Gera energia, mas com custo de impacto.</p>
-        </div>
-        <div class="legenda-item">
-          <h4>⚡ Transformação</h4>
-          <p>Desafios sobre como uma forma de energia vira outra (química → térmica → elétrica...).</p>
-        </div>
-        <div class="legenda-item">
-          <h4>⚠ Impacto</h4>
-          <p>Dilemas sobre consequências ambientais e sociais. Decidir bem reduz o impacto.</p>
-        </div>
-        <div class="legenda-item">
-          <h4>◈ Estação</h4>
-          <p>Casa tranquila: mostra um fato sobre a distribuição de energia no Brasil e no mundo.</p>
-        </div>
-        <div class="legenda-item">
-          <h4>★ Sorte</h4>
-          <p>Eventos do mundo real da energia — clima, tecnologia, acidentes — que mudam seus pontos na hora.</p>
-        </div>
+      <div class="row">
+        <button class="btn" onclick="showScreen('screen-setup')">Configurar partida</button>
+        <button class="btn secondary" onclick="showScreen('screen-rules')">Ver regras completas</button>
       </div>
+    </div>
+    <footer class="credit">2 a 6 equipes · 4 a 6 jogadores por equipe · duração ajustável</footer>
+  </section>
 
-      <h3>Os líderes</h3>
-      <div class="personagens-grid" id="grade-personagens-regras"></div>
+  <!-- ============ RULES ============ -->
+  <section id="screen-rules" class="screen">
+    <div class="eyebrow">Como jogar</div>
+    <h2 style="margin-top:0;">Regras da Rota da Energia</h2>
 
-      <div class="row" style="margin-top:18px;">
-        <button class="btn" onclick="mudarTela('tela-setup')">Montar meu grupo</button>
-        <button class="btn outline" onclick="mudarTela('tela-capa')">Voltar</button>
+    <div class="card-panel">
+      <h3 style="margin-top:0;">Objetivo</h3>
+      <p style="color:var(--text-dim);">Construir, ao longo das rodadas, a matriz energética da sua equipe: uma
+      combinação de <b style="color:var(--text)">energia limpa</b>, <b style="color:var(--text)">energia convencional</b>
+      e <b style="color:var(--text)">impacto ambiental</b> gerado. Vence a equipe com a maior pontuação final,
+      calculada valorizando fontes limpas e penalizando o impacto acumulado.</p>
+
+      <h3>Como se joga</h3>
+      <ol class="steps">
+        <li><b>Na sua vez</b>, role o dado e avance sua equipe pelo tabuleiro em circuito — ao completar uma volta, ela continua na próxima.</li>
+        <li><b>A casa em que você parar</b> define a carta que sua equipe vai enfrentar (veja os tipos abaixo).</li>
+        <li><b>Responda ou decida</b> o que a carta pede. Acertos rendem mais energia limpa ou reduzem impacto; erros custam pontos ou aumentam o impacto ambiental.</li>
+        <li>O jogo termina após o número de rodadas definido na configuração. Uma rodada acaba quando todas as equipes jogaram.</li>
+        <li>Ao final, cada equipe revela sua matriz energética e a pontuação é calculada.</li>
+      </ol>
+
+      <div class="formula">Pontuação final = (Energia Limpa × 3) + (Energia Convencional × 1) − (Impacto Ambiental × 2)</div>
+      <p style="color:var(--text-dim); font-size:13.5px;">A fórmula representa, de forma simplificada, como escolhas mais
+      sustentáveis pesam mais na construção de uma matriz energética responsável — do mesmo jeito que países e cidades
+      avaliam sua matriz real considerando não só a quantidade de energia gerada, mas também seus impactos.</p>
+    </div>
+
+    <div class="rules-grid">
+      <div class="tile-legend"><h4><span class="dot" style="background:var(--hidro)"></span>Fonte Renovável</h4>
+        <p>Perguntas sobre hidrelétrica, solar, eólica e biomassa. Acerto: +3 energia limpa.</p></div>
+      <div class="tile-legend"><h4><span class="dot" style="background:var(--fossil)"></span>Fonte Não Renovável</h4>
+        <p>Perguntas sobre carvão, petróleo, gás natural e nuclear. Gera energia convencional, mas com custo de impacto.</p></div>
+      <div class="tile-legend"><h4><span class="dot" style="background:var(--transf-c)"></span>Transformação de Energia</h4>
+        <p>Desafios sobre como uma forma de energia vira outra (química → térmica → elétrica, etc).</p></div>
+      <div class="tile-legend"><h4><span class="dot" style="background:var(--impacto-c)"></span>Impacto Ambiental</h4>
+        <p>Dilemas sobre consequências ambientais e sociais das escolhas energéticas. Decisões responsáveis reduzem o impacto.</p></div>
+      <div class="tile-legend"><h4><span class="dot" style="background:var(--estacao-c)"></span>Estação</h4>
+        <p>Casa segura: revela um fato sobre a distribuição de energia no Brasil e no mundo. Sem risco.</p></div>
+      <div class="tile-legend"><h4><span class="dot" style="background:var(--sorte-c)"></span>Sorte</h4>
+        <p>Eventos aleatórios do mundo real da energia — clima, tecnologia, acidentes — que alteram seus pontos na hora.</p></div>
+    </div>
+
+    <div class="row" style="margin-top:16px;">
+      <button class="btn" onclick="showScreen('screen-setup')">Configurar partida</button>
+      <button class="btn secondary" onclick="showScreen('screen-intro')">Voltar</button>
+    </div>
+  </section>
+
+  <!-- ============ SETUP ============ -->
+  <section id="screen-setup" class="screen">
+    <div class="eyebrow">Configuração</div>
+    <h2 style="margin-top:0;">Monte a partida</h2>
+
+    <div class="card-panel">
+      <h3 style="margin-top:0;">Número de equipes</h3>
+      <div class="count-toggle" id="team-count-toggle"></div>
+
+      <h3>Nomes das equipes</h3>
+      <div id="team-inputs"></div>
+
+      <h3 style="margin-top:22px;">Duração da partida</h3>
+      <div class="count-toggle" id="round-toggle"></div>
+      <p style="color:var(--text-dim); font-size:13px;">Uma rodada termina quando todas as equipes já jogaram uma vez.</p>
+
+      <div class="row" style="margin-top:20px;">
+        <button class="btn" onclick="startGame()">Começar jogo</button>
+        <button class="btn secondary" onclick="showScreen('screen-intro')">Voltar</button>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- tela 3: setup -->
-    <section id="tela-setup" class="screen">
-      <h2>Montar a partida</h2>
-      <div class="card">
-        <h3 style="margin-top:0;">Quantos grupos vão jogar?</h3>
-        <div class="opcoes-num" id="opcoes-grupos"></div>
-
-        <h3>Nome e personagem de cada grupo</h3>
-        <div id="lista-equipes"></div>
-
-        <h3 style="margin-top:18px;">Quanto tempo de jogo?</h3>
-        <div class="opcoes-num" id="opcoes-rodadas"></div>
-        <p style="color:var(--ink-soft); font-size:13px;">Uma rodada termina quando todo mundo já jogou uma vez.</p>
-
-        <div class="row" style="margin-top:16px;">
-          <button class="btn" onclick="comecarJogo()">Começar!</button>
-          <button class="btn outline" onclick="mudarTela('tela-capa')">Voltar</button>
-        </div>
+  <!-- ============ GAME ============ -->
+  <section id="screen-game" class="screen">
+    <div class="game-top">
+      <div>
+        <div class="eyebrow" style="margin-bottom:2px;">Partida em andamento</div>
+        <div class="round-badge" id="round-label">Rodada 1 de 10</div>
       </div>
-    </section>
+      <button class="icon-btn" onclick="showScreen('screen-rules')">Regras ↗</button>
+    </div>
 
-    <section id="tela-jogo" class="screen">
-      <div class="topo-jogo">
-        <div>
-          <div class="tag" id="rotulo-rodada">rodada 1 de 10</div>
-        </div>
-        <button class="btn small outline" onclick="mudarTela('tela-regras')">regras</button>
-      </div>
+    <div class="game-layout">
+      <div class="board" id="board"></div>
 
-      <div class="layout-jogo">
-        <div>
-          <div class="tabuleiro" id="tabuleiro"></div>
-          <div class="legenda-tabuleiro">
-            <span><span class="bolinha" style="background:#cfe1e9"></span>renovável</span>
-            <span><span class="bolinha" style="background:#e9cfc8"></span>não renovável</span>
-            <span><span class="bolinha" style="background:#f3ddad"></span>transformação</span>
-            <span><span class="bolinha" style="background:#f0c9a8"></span>impacto</span>
-            <span><span class="bolinha" style="background:#cfe6dd"></span>estação</span>
-            <span><span class="bolinha" style="background:#e2d3ea"></span>sorte</span>
+      <div class="side-panel">
+        <div class="turn-card">
+          <div class="eyebrow" style="margin-bottom:2px;">Vez de</div>
+          <div class="turn-team-name" id="turn-team-name">—</div>
+          <div class="dice-area">
+            <div class="die" id="die">?</div>
+            <button class="btn" id="roll-btn" onclick="rollDice()">Rolar dado</button>
           </div>
+          <div style="font-size:12.5px; color:var(--text-dim);" id="turn-hint">Role o dado para avançar pelo tabuleiro.</div>
         </div>
 
-        <div class="painel-lateral">
-          <div class="card">
-            <div class="tag">vez de</div>
-            <div class="nome-equipe-vez" id="nome-vez">—</div>
-            <div class="linha-personagem" id="linha-personagem-vez"></div>
-            <div class="area-dado">
-              <div class="dado" id="dado">?</div>
-              <button class="btn" id="botao-rolar" onclick="rolarDado()">rolar dado</button>
-            </div>
-            <div style="font-size:12.5px; color:var(--ink-soft);" id="dica-vez">role o dado para andar no tabuleiro.
-            </div>
-          </div>
+        <div class="turn-card">
+          <div class="eyebrow" style="margin-bottom:10px;">Matrizes das equipes</div>
+          <div class="teams-scoreboard" id="scoreboard"></div>
+        </div>
 
-          <div class="card">
-            <div class="tag" style="margin-bottom:8px;">matrizes dos grupos</div>
-            <div class="placar" id="placar"></div>
-          </div>
-
-          <div class="card">
-            <div class="tag" style="margin-bottom:8px;">o que rolou</div>
-            <div class="registro" id="registro"></div>
-          </div>
+        <div class="turn-card">
+          <div class="eyebrow" style="margin-bottom:8px;">Registro da partida</div>
+          <div class="log" id="log"></div>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- tela 5: fim -->
-    <section id="tela-fim" class="screen">
-      <h2>Vilanova tem luz de novo!</h2>
-      <p style="color:var(--ink-soft);">O grupo com a matriz mais equilibrada — bastante energia limpa,
-        uso consciente da energia convencional e pouco impacto — venceu esta partida.</p>
-      <div id="ranking"></div>
-      <div class="row" style="margin-top:18px;">
-        <button class="btn" onclick="mudarTela('tela-setup')">Jogar de novo</button>
-        <button class="btn outline" onclick="mudarTela('tela-capa')">Voltar ao início</button>
+  <!-- ============ END ============ -->
+  <section id="screen-end" class="screen">
+    <div class="eyebrow">Fim de partida</div>
+    <h2 style="margin-top:0;">Resultado final</h2>
+    <p style="color:var(--text-dim);">A equipe com a matriz energética mais equilibrada — muita energia limpa,
+    uso consciente da energia convencional e baixo impacto ambiental — venceu esta rodada de planejamento.</p>
+    <div id="ranking"></div>
+    <div class="row" style="margin-top:20px;">
+      <button class="btn" onclick="showScreen('screen-setup')">Jogar novamente</button>
+      <button class="btn secondary" onclick="showScreen('screen-intro')">Voltar ao início</button>
+    </div>
+  </section>
+
+</div>
+
+<!-- ============ CARD MODAL ============ -->
+<div class="modal-overlay hidden" id="modal-overlay">
+  <div class="modal-card" id="modal-card"></div>
+</div>
+
+<script>
+/* =========================================================
+   DATA
+========================================================= */
+const TILE_SEQUENCE = [
+ 'renovavel','transformacao','naorenovavel','sorte','estacao','impacto',
+ 'renovavel','naorenovavel','transformacao','sorte','impacto','estacao',
+ 'renovavel','sorte','naorenovavel','transformacao','estacao','impacto',
+ 'renovavel','naorenovavel','sorte','transformacao','impacto','estacao',
+ 'renovavel','naorenovavel'
+];
+
+const ICONS = {
+  renovavel:'☀', naorenovavel:'⛽', transformacao:'⚡', impacto:'⚠', estacao:'◈', sorte:'★'
+};
+const LABELS = {
+  renovavel:'Renovável', naorenovavel:'Não renovável', transformacao:'Transformação',
+  impacto:'Impacto', estacao:'Estação', sorte:'Sorte'
+};
+
+const DECKS = {
+  renovavel:[
+    {p:"Qual transformação de energia ocorre em uma usina hidrelétrica?",
+     o:["Energia química em energia elétrica","Energia mecânica (da água em movimento) em energia elétrica","Energia térmica em energia elétrica","Energia luminosa em energia elétrica"],
+     c:1, e:"A água represada possui energia potencial gravitacional, que vira energia cinética ao cair e movimenta turbinas, gerando eletricidade."},
+    {p:"Qual é o princípio físico que permite aos painéis solares gerarem eletricidade diretamente da luz?",
+     o:["Efeito fotovoltaico","Efeito Joule","Indução eletromagnética por atrito","Fissão nuclear"],
+     c:0, e:"O efeito fotovoltaico converte a energia luminosa diretamente em energia elétrica, sem etapas térmicas ou mecânicas intermediárias."},
+    {p:"De onde vem a energia aproveitada pelas turbinas eólicas?",
+     o:["Da energia cinética do vento","Da energia química do ar","Da energia potencial gravitacional das nuvens","Da energia nuclear atmosférica"],
+     c:0, e:"O vento em movimento possui energia cinética, que gira as pás da turbina e é convertida em energia elétrica pelo gerador."},
+    {p:"O que caracteriza a energia de biomassa?",
+     o:["Uso de matéria orgânica, como cana-de-açúcar, madeira ou resíduos agrícolas","Uso de urânio enriquecido","Uso de gás natural extraído do subsolo","Uso da força das águas represadas"],
+     c:0, e:"A biomassa converte energia química armazenada em matéria orgânica em energia térmica ou elétrica através da queima ou fermentação."},
+    {p:"Qual é uma vantagem da energia hidrelétrica em relação aos combustíveis fósseis?",
+     o:["Não emite gases de efeito estufa diretamente durante a geração de eletricidade","Não precisa de nenhum tipo de infraestrutura","Gera resíduos radioativos","Depende exclusivamente do vento"],
+     c:0, e:"Diferente de termelétricas a carvão ou gás, a geração hidrelétrica não queima combustível, evitando emissões diretas de CO2."},
+    {p:"O Brasil tem grande potencial de energia solar principalmente por quê?",
+     o:["Alta incidência de radiação solar ao longo do ano, especialmente no Nordeste","Clima predominantemente frio e nublado","Baixíssima insolação em quase todo o território","Relevo majoritariamente montanhoso"],
+     c:0, e:"A localização predominantemente tropical do Brasil garante altos índices de radiação solar durante boa parte do ano."},
+    {p:"Qual região brasileira se destaca na geração de energia eólica, beneficiada por ventos constantes vindos do oceano?",
+     o:["O litoral da Região Nordeste","O interior da Região Norte","O Pantanal","O planalto central exclusivamente"],
+     c:0, e:"Os ventos alísios que sopram sobre o litoral nordestino tornam a região uma das mais competitivas do mundo para energia eólica."},
+    {p:"Além da água, do vento e do sol, qual destas também é considerada uma fonte renovável de energia?",
+     o:["Biomassa","Carvão mineral","Petróleo","Gás natural"],
+     c:0, e:"A biomassa é renovável porque sua matéria-prima (plantas, resíduos orgânicos) pode ser reposta em ciclos relativamente curtos."}
+  ],
+  naorenovavel:[
+    {p:"A queima do carvão mineral em usinas termelétricas transforma qual tipo de energia em energia térmica?",
+     o:["Energia química","Energia nuclear","Energia potencial gravitacional","Energia eólica"],
+     c:0, e:"O carvão armazena energia química que, ao ser queimado, se transforma em energia térmica, usada para gerar vapor e mover turbinas."},
+    {p:"O petróleo é classificado como fonte de energia não renovável porque...",
+     o:["Sua formação geológica leva milhões de anos, muito mais rápido do que é consumido","Ele nunca se esgota, não importa o quanto seja usado","É produzido artificialmente em laboratório","É considerado uma fonte limpa de energia"],
+     c:0, e:"Na verdade sua formação leva milhões de anos e é muitíssimo mais lenta do que o ritmo de consumo humano — por isso é não renovável."},
+    {p:"Em comparação ao carvão mineral, o gás natural geralmente...",
+     o:["Emite menos poluentes na queima, mas ainda é uma fonte fóssil não renovável","É uma fonte totalmente renovável","Não emite nenhum tipo de gás na queima","É usado apenas para gerar energia solar"],
+     c:0, e:"O gás natural queima de forma mais limpa que o carvão, mas continua sendo um combustível fóssil finito."},
+    {p:"A energia nuclear é obtida principalmente por meio de qual processo?",
+     o:["Fissão nuclear do urânio","Fusão do hidrogênio, como ocorre no Sol","Queima de biomassa","Efeito fotovoltaico"],
+     c:0, e:"Nas usinas nucleares atuais, o núcleo do átomo de urânio é dividido (fissão), liberando grande quantidade de energia térmica."},
+    {p:"Qual é um dos principais desafios da energia nuclear?",
+     o:["O armazenamento seguro dos rejeitos radioativos por longos períodos","A altíssima emissão direta de CO2 durante a geração","A dependência total da força do vento","A impossibilidade de gerar eletricidade em larga escala"],
+     c:0, e:"Apesar de ter baixa emissão de carbono na geração, a energia nuclear produz rejeitos radioativos que exigem armazenamento seguro por muitos anos."},
+    {p:"Qual destas fontes ainda é uma das mais utilizadas na matriz energética mundial, apesar de ser altamente poluente?",
+     o:["Carvão mineral","Energia eólica","Energia solar","Biomassa"],
+     c:0, e:"O carvão mineral, mesmo sendo um dos combustíveis mais poluentes, ainda representa uma fatia expressiva da matriz energética mundial."},
+    {p:"Historicamente, qual região concentra grande parte das reservas mundiais de petróleo?",
+     o:["Oriente Médio","Escandinávia","Oceania","Antártida"],
+     c:0, e:"O Oriente Médio concentra historicamente uma das maiores reservas provadas de petróleo do planeta, influenciando a geopolítica energética mundial."},
+    {p:"Comparada à matriz elétrica mundial, a matriz elétrica brasileira se destaca por...",
+     o:["Ter forte participação de fontes renováveis, principalmente a hidrelétrica","Depender quase exclusivamente do carvão mineral","Ser praticamente 100% nuclear","Não utilizar nenhuma fonte renovável"],
+     c:0, e:"Diferente da média mundial, a matriz elétrica brasileira tem uma das maiores participações de fontes renováveis do mundo, puxada pelas hidrelétricas."}
+  ],
+  transformacao:[
+    {p:"Em uma usina termelétrica a carvão, qual é a sequência correta de transformação de energia?",
+     o:["Química → térmica → mecânica → elétrica","Elétrica → química → térmica","Luminosa → sonora → elétrica","Nuclear → química → térmica"],
+     c:0, e:"A energia química do carvão vira térmica ao ser queimada, que aquece água e gera vapor, movendo turbinas (energia mecânica) que acionam o gerador elétrico."},
+    {p:"Em um painel fotovoltaico, a energia é transformada diretamente de qual forma para qual forma?",
+     o:["Luminosa para elétrica","Química para elétrica","Mecânica para elétrica","Térmica para elétrica"],
+     c:0, e:"O efeito fotovoltaico converte a luz do sol diretamente em corrente elétrica, sem etapas intermediárias."},
+    {p:"Em uma usina hidrelétrica, qual é a sequência de transformação de energia?",
+     o:["Potencial gravitacional → cinética → mecânica → elétrica","Química → elétrica diretamente","Nuclear → térmica → elétrica","Luminosa → química"],
+     c:0, e:"A água armazenada tem energia potencial, que vira cinética ao cair, gira as turbinas (energia mecânica) e é convertida em eletricidade."},
+    {p:"Quando uma pilha alimenta uma lanterna, ocorre a transformação de...",
+     o:["Energia química em energia elétrica e depois em energia luminosa","Energia nuclear em energia térmica","Energia mecânica em energia química","Energia sonora em energia elétrica"],
+     c:0, e:"As reações químicas dentro da pilha geram corrente elétrica, que ao passar pela lâmpada se transforma em luz (e um pouco de calor)."},
+    {p:"Um alto-falante transforma energia elétrica em qual tipo de energia?",
+     o:["Energia sonora","Energia nuclear","Energia potencial gravitacional","Energia química"],
+     c:0, e:"O sinal elétrico movimenta uma membrana no alto-falante, produzindo vibrações no ar que percebemos como som."},
+    {p:"De acordo com a Lei da Conservação de Energia, quando a energia passa de uma forma para outra...",
+     o:["A quantidade total de energia se mantém constante, apenas mudando de forma","Parte da energia é destruída para sempre","A energia é sempre criada a partir do nada","A energia desaparece completamente do sistema"],
+     c:0, e:"A energia não pode ser criada nem destruída, apenas transformada de uma forma em outra — esse é o princípio da conservação de energia."},
+    {p:"Em uma usina nuclear, a energia liberada pela fissão do urânio é primeiro transformada em...",
+     o:["Energia térmica, que aquece água e gera vapor para mover turbinas","Energia luminosa diretamente","Energia química","Energia sonora"],
+     c:0, e:"A fissão nuclear libera energia térmica intensa, usada para produzir vapor que movimenta turbinas e gera eletricidade — de forma parecida com uma termelétrica."},
+    {p:"Ao pedalar uma bicicleta equipada com um dínamo para acender uma luz, a transformação de energia segue qual ordem?",
+     o:["Mecânica (do pedalar) → elétrica → luminosa","Química → nuclear","Térmica → sonora","Luminosa → mecânica"],
+     c:0, e:"O movimento das pernas (energia mecânica) gira o dínamo, que gera eletricidade, acendendo a lâmpada (energia luminosa)."}
+  ],
+  impacto:[
+    {p:"Uma usina hidrelétrica está planejada em uma região com comunidades ribeirinhas e floresta nativa. Qual atitude é mais responsável antes da construção?",
+     o:["Realizar estudo de impacto ambiental (EIA) e consultar as comunidades afetadas","Iniciar a obra imediatamente, sem qualquer estudo","Ignorar as comunidades locais completamente","Desviar o curso do rio sem aviso prévio"],
+     c:0, e:"Estudos de impacto ambiental e consulta às comunidades são etapas essenciais para reduzir danos sociais e ambientais em grandes obras energéticas."},
+    {p:"Uma usina termelétrica a carvão aumentou sua produção. Qual consequência ambiental está mais associada a essa fonte?",
+     o:["Aumento da emissão de gases de efeito estufa e poluentes atmosféricos","Redução da poluição do ar na região","Nenhum impacto ambiental relevante","Aumento imediato da biodiversidade local"],
+     c:0, e:"A queima de carvão libera grandes quantidades de CO2 e outros poluentes, contribuindo para o aquecimento global e problemas respiratórios."},
+    {p:"Um vazamento de petróleo ocorreu próximo à costa. Qual é a medida mais adequada a ser tomada?",
+     o:["Acionar planos de contenção e limpeza emergencial, monitorando fauna e flora afetadas","Esperar a maré levar o óleo embora naturalmente","Não tomar nenhuma providência","Aumentar a extração de petróleo no mesmo local"],
+     c:0, e:"Vazamentos exigem resposta rápida com contenção, limpeza e monitoramento ambiental para reduzir os danos a ecossistemas marinhos e costeiros."},
+    {p:"A instalação de painéis solares em larga escala em uma área desértica pode gerar qual tipo de discussão socioambiental?",
+     o:["Uso do solo e possíveis impactos em ecossistemas locais, mesmo sendo uma fonte limpa","Nenhuma discussão, já que energia solar não gera impacto algum","Aumento da poluição do ar por queima de combustível","Emissão de resíduos radioativos"],
+     c:0, e:"Mesmo fontes limpas podem gerar debates sobre uso do solo, desmatamento local ou impacto em espécies nativas — sustentabilidade envolve vários fatores."},
+    {p:"Comunidades próximas a parques eólicos às vezes reclamam de qual impacto?",
+     o:["Ruído das turbinas e alteração da paisagem local","Vazamento de petróleo","Poluição do ar por queima de combustível fóssil","Contaminação radioativa"],
+     c:0, e:"Embora não emitam poluentes, parques eólicos podem gerar incômodo sonoro e mudanças na paisagem, temas debatidos no licenciamento ambiental."},
+    {p:"Um dos impactos sociais da construção de grandes hidrelétricas é...",
+     o:["A necessidade de realocação de populações que viviam na área alagada pelo reservatório","O aumento imediato da caça predatória em todo o país","A extinção garantida de todas as espécies aquáticas","Nenhum impacto social relevante"],
+     c:0, e:"A formação do reservatório pode alagar áreas habitadas, exigindo o reassentamento de famílias e comunidades tradicionais."},
+    {p:"Resíduos radioativos de usinas nucleares precisam de qual tipo de tratamento?",
+     o:["Armazenamento especial e isolado por longos períodos, devido à radioatividade","Descarte comum em aterros sanitários urbanos","Liberação direta em rios próximos","Nenhum tratamento é necessário"],
+     c:0, e:"O material radioativo permanece perigoso por muitos anos e precisa de instalações de armazenamento seguras e isoladas."},
+    {p:"Ao planejar a expansão da matriz energética de um país, o que caracteriza uma escolha mais sustentável?",
+     o:["Diversificar as fontes, priorizando renováveis e considerando impactos sociais e ambientais","Depender de uma única fonte não renovável","Ignorar completamente os impactos ambientais em nome do lucro","Não considerar as comunidades locais nas decisões"],
+     c:0, e:"Matrizes energéticas mais sustentáveis costumam diversificar fontes renováveis e levar em conta os impactos sociais e ambientais de cada escolha."}
+  ],
+  estacao:[
+    {texto:"Cerca de metade da matriz elétrica brasileira vem de hidrelétricas, o que torna o país uma referência mundial em energia renovável na geração de eletricidade."},
+    {texto:"Em nível mundial, os combustíveis fósseis — carvão, petróleo e gás natural — ainda respondem pela maior parte da matriz energética global."},
+    {texto:"O litoral nordestino é uma das regiões com maior potencial eólico do Brasil, graças aos ventos constantes vindos do oceano."},
+    {texto:"Vários países europeus investem fortemente em energia eólica offshore — instalada no mar — para ampliar a geração renovável."},
+    {texto:"A China é uma das maiores investidoras do mundo em energia solar e eólica, mas ao mesmo tempo ainda depende bastante do carvão mineral."},
+    {texto:"O Oriente Médio concentra historicamente grandes reservas de petróleo, o que influencia fortemente a geopolítica mundial da energia."},
+    {texto:"A construção de grandes hidrelétricas na Amazônia gera debates sobre o equilíbrio entre gerar energia limpa e preservar a floresta e os povos locais."},
+    {texto:"Além da hidrelétrica, o Sul do Brasil também vem ampliando a geração de energia eólica em áreas costeiras."}
+  ],
+  sorte:[
+    {texto:"Chuvas intensas enchem os reservatórios! Sua equipe ganha energia limpa extra.", ef:{limpa:3,convencional:0,impacto:0}},
+    {texto:"Uma seca prolongada reduz a geração hidrelétrica da sua equipe.", ef:{limpa:-2,convencional:0,impacto:0}},
+    {texto:"Ventos fortes sopram na costa: as turbinas eólicas da sua equipe geram acima do esperado.", ef:{limpa:2,convencional:0,impacto:0}},
+    {texto:"Um vazamento em um duto de petróleo afeta a região da sua equipe.", ef:{limpa:0,convencional:0,impacto:3}},
+    {texto:"Uma nova tecnologia melhora a eficiência dos painéis solares da sua equipe.", ef:{limpa:2,convencional:0,impacto:0}},
+    {texto:"Alta demanda de energia aciona termelétricas extras para atender sua equipe.", ef:{limpa:0,convencional:2,impacto:2}},
+    {texto:"Um programa de reflorestamento compensa parte das emissões da sua equipe.", ef:{limpa:0,convencional:0,impacto:-2}},
+    {texto:"Manutenção emergencial interrompe uma usina: sua equipe perde a próxima rodada de jogo.", ef:{limpa:0,convencional:0,impacto:0,pular:true}},
+    {texto:"Investimento internacional impulsiona a produção de biomassa da sua equipe.", ef:{limpa:2,convencional:0,impacto:0}},
+    {texto:"Uma falha de segurança exige inspeção extra em uma usina nuclear da sua equipe.", ef:{limpa:0,convencional:0,impacto:2}}
+  ]
+};
+
+const TEAM_COLORS = ['#f4b93e','#4fd1a5','#2e86ab','#c25454','#9b6fb3','#e2683f'];
+
+/* =========================================================
+   STATE
+========================================================= */
+let state = {
+  teamCount: 3,
+  roundLimit: 10,
+  teams: [],
+  currentTeamIdx: 0,
+  round: 1,
+  lastRoll: null,
+  awaitingCard: false
+};
+
+/* =========================================================
+   SCREEN NAV
+========================================================= */
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(id==='screen-setup') renderSetup();
+}
+
+/* =========================================================
+   SETUP SCREEN
+========================================================= */
+function renderSetup(){
+  const tc = document.getElementById('team-count-toggle');
+  tc.innerHTML='';
+  for(let n=2;n<=6;n++){
+    const b=document.createElement('button');
+    b.textContent=n+' equipes';
+    if(n===state.teamCount) b.classList.add('sel');
+    b.onclick=()=>{state.teamCount=n; renderSetup();};
+    tc.appendChild(b);
+  }
+  const ti = document.getElementById('team-inputs');
+  ti.innerHTML='';
+  for(let i=0;i<state.teamCount;i++){
+    const div=document.createElement('div');
+    div.className='setup-team';
+    const swatch=document.createElement('div');
+    swatch.className='color-swatch';
+    swatch.style.background=TEAM_COLORS[i];
+    const input=document.createElement('input');
+    input.type='text';
+    input.placeholder='Nome da equipe '+(i+1);
+    input.value = (state.teams[i] && state.teams[i].name) ? state.teams[i].name : ('Equipe '+(i+1));
+    input.dataset.idx=i;
+    div.appendChild(swatch);
+    div.appendChild(input);
+    ti.appendChild(div);
+  }
+  const rt = document.getElementById('round-toggle');
+  rt.innerHTML='';
+  [8,12,16].forEach(n=>{
+    const b=document.createElement('button');
+    b.textContent=n+' rodadas';
+    if(n===state.roundLimit) b.classList.add('sel');
+    b.onclick=()=>{state.roundLimit=n; renderSetup();};
+    rt.appendChild(b);
+  });
+}
+
+function startGame(){
+  const inputs = document.querySelectorAll('#team-inputs input');
+  state.teams = [];
+  inputs.forEach((inp,i)=>{
+    state.teams.push({
+      name: inp.value.trim() || ('Equipe '+(i+1)),
+      color: TEAM_COLORS[i],
+      pos: 0,
+      limpa: 0,
+      convencional: 0,
+      impacto: 0,
+      skipNext: false
+    });
+  });
+  state.currentTeamIdx = 0;
+  state.round = 1;
+  showScreen('screen-game');
+  renderBoard();
+  renderScoreboard();
+  updateTurnUI();
+  logMsg('A partida começou! Boa sorte na construção das matrizes energéticas.');
+}
+
+/* =========================================================
+   BOARD RENDER
+========================================================= */
+function renderBoard(){
+  const board = document.getElementById('board');
+  board.innerHTML='';
+  const perRow = 6;
+  const rows = Math.ceil(TILE_SEQUENCE.length/perRow);
+  for(let r=0;r<rows;r++){
+    const rowDiv = document.createElement('div');
+    rowDiv.className='board-row'+(r%2===1?' reverse':'');
+    for(let c=0;c<perRow;c++){
+      const idx = r*perRow + c;
+      if(idx>=TILE_SEQUENCE.length) break;
+      const type = TILE_SEQUENCE[idx];
+      const tile = document.createElement('div');
+      tile.className='tile '+type;
+      tile.id='tile-'+idx;
+      tile.innerHTML = `<span class="idx">${idx+1}</span><span class="ic">${ICONS[type]}</span><div class="tokens" id="tokens-${idx}"></div>`;
+      rowDiv.appendChild(tile);
+    }
+    board.appendChild(rowDiv);
+  }
+  placeTokens();
+}
+
+function placeTokens(){
+  document.querySelectorAll('[id^="tokens-"]').forEach(el=>el.innerHTML='');
+  state.teams.forEach(team=>{
+    const idx = team.pos % TILE_SEQUENCE.length;
+    const holder = document.getElementById('tokens-'+idx);
+    if(holder){
+      const t=document.createElement('div');
+      t.className='token';
+      t.style.background=team.color;
+      holder.appendChild(t);
+    }
+  });
+}
+
+/* =========================================================
+   SCOREBOARD
+========================================================= */
+function renderScoreboard(){
+  const sb = document.getElementById('scoreboard');
+  sb.innerHTML='';
+  state.teams.forEach((team,i)=>{
+    const total = team.limpa+team.convencional;
+    const limpaPct = total? (team.limpa/total*100):50;
+    const convPct = total? (team.convencional/total*100):50;
+    const row=document.createElement('div');
+    row.className='team-row'+(i===state.currentTeamIdx?' current':'');
+    row.innerHTML = `
+      <div class="team-row-top">
+        <div class="team-name-tag"><span class="dot" style="background:${team.color}"></span>${team.name}</div>
+        <div class="mono" style="font-size:12px; color:var(--text-dim);">casa ${ (team.pos % TILE_SEQUENCE.length)+1 }</div>
       </div>
-    </section>
-  </div>
-  <div class="fundo-modal escondido" id="fundo-modal">
-    <div class="carta-modal" id="carta-modal"></div>
-  </div>
+      <div class="matrix-bar"><div class="seg-limpa" style="width:${limpaPct}%"></div><div class="seg-conv" style="width:${convPct}%"></div></div>
+      <div class="mini-stats">
+        <span>Limpa: <b>${team.limpa}</b></span>
+        <span>Convencional: <b>${team.convencional}</b></span>
+        <span>Impacto: <b>${team.impacto}</b></span>
+      </div>`;
+    sb.appendChild(row);
+  });
+}
+
+function logMsg(msg){
+  const log = document.getElementById('log');
+  const d = document.createElement('div');
+  d.textContent = msg;
+  log.prepend(d);
+}
+
+/* =========================================================
+   TURN / DICE
+========================================================= */
+function updateTurnUI(){
+  const team = state.teams[state.currentTeamIdx];
+  document.getElementById('round-label').textContent = `Rodada ${state.round} de ${state.roundLimit}`;
+  document.getElementById('turn-team-name').innerHTML = `<span class="dot" style="background:${team.color}"></span>${team.name}`;
+  document.getElementById('roll-btn').disabled = false;
+  document.getElementById('die').textContent='?';
+  document.getElementById('turn-hint').textContent='Role o dado para avançar pelo tabuleiro.';
+
+  if(team.skipNext){
+    document.getElementById('turn-hint').textContent = 'Esta equipe perde a vez devido a um evento anterior.';
+    document.getElementById('roll-btn').disabled = true;
+    setTimeout(()=>{
+      team.skipNext=false;
+      logMsg(`${team.name} perdeu a vez nesta rodada.`);
+      advanceTurn();
+    }, 1400);
+  }
+}
+
+function rollDice(){
+  if(state.awaitingCard) return;
+  document.getElementById('roll-btn').disabled = true;
+  const die = document.getElementById('die');
+  die.classList.add('rolling');
+  let ticks=0;
+  const iv=setInterval(()=>{
+    die.textContent = 1+Math.floor(Math.random()*6);
+    ticks++;
+    if(ticks>6){
+      clearInterval(iv);
+      die.classList.remove('rolling');
+      const roll = 1+Math.floor(Math.random()*6);
+      die.textContent = roll;
+      moveCurrentTeam(roll);
+    }
+  },70);
+}
+
+function moveCurrentTeam(roll){
+  const team = state.teams[state.currentTeamIdx];
+  team.pos += roll;
+  const tileIdx = team.pos % TILE_SEQUENCE.length;
+  placeTokens();
+  renderScoreboard();
+  const tileEl = document.getElementById('tile-'+tileIdx);
+  if(tileEl){ tileEl.style.outline='2px solid #fff'; setTimeout(()=>tileEl.style.outline='',900); }
+  logMsg(`${team.name} rolou ${roll} e caiu na casa ${tileIdx+1} (${LABELS[TILE_SEQUENCE[tileIdx]]}).`);
+  openCard(TILE_SEQUENCE[tileIdx]);
+}
+
+/* =========================================================
+   CARD MODAL
+========================================================= */
+function openCard(type){
+  state.awaitingCard = true;
+  const overlay = document.getElementById('modal-overlay');
+  const card = document.getElementById('modal-card');
+  overlay.classList.remove('hidden');
+
+  if(type==='estacao'){
+    const deck = DECKS.estacao;
+    const c = deck[Math.floor(Math.random()*deck.length)];
+    card.innerHTML = `
+      <div class="modal-tag" style="color:var(--estacao-c)">◈ Estação</div>
+      <h3>Fato sobre a matriz energética</h3>
+      <p class="fact-text">${c.texto}</p>
+      <div class="delta-tags"><span class="delta-tag" style="border-color:var(--eolica); color:var(--eolica)">+1 energia limpa</span></div>
+      <div class="row" style="margin-top:18px;"><button class="btn" onclick="resolveNonQuestion('estacao', {limpa:1,convencional:0,impacto:0})">Continuar</button></div>`;
+    return;
+  }
+
+  if(type==='sorte'){
+    const deck = DECKS.sorte;
+    const c = deck[Math.floor(Math.random()*deck.length)];
+    const tags=[];
+    if(c.ef.limpa) tags.push(`<span class="delta-tag" style="border-color:var(--eolica); color:${c.ef.limpa>0?'var(--eolica)':'var(--bad)'}">${c.ef.limpa>0?'+':''}${c.ef.limpa} limpa</span>`);
+    if(c.ef.convencional) tags.push(`<span class="delta-tag" style="border-color:var(--fossil); color:var(--fossil)">${c.ef.convencional>0?'+':''}${c.ef.convencional} convencional</span>`);
+    if(c.ef.impacto) tags.push(`<span class="delta-tag" style="border-color:var(--impacto-c); color:var(--impacto-c)">${c.ef.impacto>0?'+':''}${c.ef.impacto} impacto</span>`);
+    if(c.ef.pular) tags.push(`<span class="delta-tag" style="border-color:var(--sorte-c); color:var(--sorte-c)">perde a próxima vez</span>`);
+    card.innerHTML = `
+      <div class="modal-tag" style="color:var(--sorte-c)">★ Sorte</div>
+      <h3>Evento inesperado</h3>
+      <p class="fact-text">${c.texto}</p>
+      <div class="delta-tags">${tags.join('')}</div>
+      <div class="row" style="margin-top:18px;"><button class="btn" onclick='resolveSorte(${JSON.stringify(c.ef)})'>Continuar</button></div>`;
+    return;
+  }
+
+  // question-based decks
+  const deck = DECKS[type];
+  const c = deck[Math.floor(Math.random()*deck.length)];
+  const color = 'var(--'+(type==='naorenovavel'?'naorenov-c':type==='renovavel'?'renov-c':type==='transformacao'?'transf-c':'impacto-c')+')';
+  const opts = c.o.map((opt,i)=>`<button class="opt" data-i="${i}" onclick="answerQuestion(${i})">${opt}</button>`).join('');
+  card.innerHTML = `
+    <div class="modal-tag" style="color:${color}">${ICONS[type]} ${LABELS[type]}</div>
+    <h3>${c.p}</h3>
+    <div class="opt-list" id="opt-list">${opts}</div>
+    <div class="feedback" id="feedback"></div>`;
+  card._current = c;
+  card._type = type;
+}
+
+function answerQuestion(i){
+  const card = document.getElementById('modal-card');
+  const c = card._current;
+  const type = card._type;
+  const opts = card.querySelectorAll('.opt');
+  opts.forEach(o=>o.disabled=true);
+  const correct = (i===c.c);
+  opts[c.c].classList.add('correct');
+  if(!correct) opts[i].classList.add('wrong');
+
+  const fb = document.getElementById('feedback');
+  fb.classList.add('show', correct?'ok':'no');
+  fb.textContent = (correct? '✓ Correto! ':'✕ Não foi dessa vez. ') + c.e;
+
+  const delta = computeEffect(type, correct);
+  applyDelta(delta);
+
+  const tagsHTML = deltaTags(delta);
+  const contBtn = document.createElement('div');
+  contBtn.className='row';
+  contBtn.style.marginTop='14px';
+  contBtn.innerHTML = tagsHTML + `<button class="btn" style="margin-top:10px;" onclick="closeCard()">Continuar</button>`;
+  card.appendChild(contBtn);
+}
+
+function computeEffect(type, correct){
+  switch(type){
+    case 'renovavel': return {limpa: correct?3:1, convencional:0, impacto:0};
+    case 'naorenovavel': return correct? {limpa:0,convencional:2,impacto:1} : {limpa:0,convencional:1,impacto:2};
+    case 'transformacao': return correct? {limpa:2,convencional:1,impacto:0} : {limpa:0,convencional:0,impacto:1};
+    case 'impacto': return correct? {limpa:2,convencional:0,impacto:-2} : {limpa:0,convencional:0,impacto:3};
+    default: return {limpa:0,convencional:0,impacto:0};
+  }
+}
+
+function deltaTags(delta){
+  const tags=[];
+  if(delta.limpa) tags.push(`<span class="delta-tag" style="border-color:var(--eolica); color:var(--eolica)">${delta.limpa>0?'+':''}${delta.limpa} limpa</span>`);
+  if(delta.convencional) tags.push(`<span class="delta-tag" style="border-color:var(--fossil); color:var(--fossil)">${delta.convencional>0?'+':''}${delta.convencional} convencional</span>`);
+  if(delta.impacto) tags.push(`<span class="delta-tag" style="border-color:var(--impacto-c); color:var(--impacto-c)">${delta.impacto>0?'+':''}${delta.impacto} impacto</span>`);
+  return `<div class="delta-tags">${tags.join('')}</div>`;
+}
+
+function applyDelta(delta){
+  const team = state.teams[state.currentTeamIdx];
+  team.limpa = Math.max(0, team.limpa + (delta.limpa||0));
+  team.convencional = Math.max(0, team.convencional + (delta.convencional||0));
+  team.impacto = Math.max(0, team.impacto + (delta.impacto||0));
+  renderScoreboard();
+}
+
+function resolveNonQuestion(type, delta){
+  applyDelta(delta);
+  logMsg(`${state.teams[state.currentTeamIdx].name} visitou uma estação informativa.`);
+  closeCard();
+}
+
+function resolveSorte(ef){
+  applyDelta(ef);
+  const team = state.teams[state.currentTeamIdx];
+  if(ef.pular) team.skipNext = true;
+  logMsg(`${team.name} enfrentou um evento de sorte.`);
+  closeCard();
+}
+
+function closeCard(){
+  document.getElementById('modal-overlay').classList.add('hidden');
+  document.getElementById('modal-card').innerHTML='';
+  state.awaitingCard = false;
+  advanceTurn();
+}
+
+/* =========================================================
+   TURN ADVANCE / END GAME
+========================================================= */
+function advanceTurn(){
+  state.currentTeamIdx++;
+  if(state.currentTeamIdx >= state.teams.length){
+    state.currentTeamIdx = 0;
+    state.round++;
+  }
+  if(state.round > state.roundLimit){
+    endGame();
+    return;
+  }
+  updateTurnUI();
+}
+
+function endGame(){
+  const scored = state.teams.map(t=>{
+    const pontuacao = (t.limpa*3)+(t.convencional*1)-(t.impacto*2);
+    return {...t, pontuacao};
+  }).sort((a,b)=>b.pontuacao-a.pontuacao);
+
+  const ranking = document.getElementById('ranking');
+  ranking.innerHTML='';
+  scored.forEach((t,i)=>{
+    const row=document.createElement('div');
+    row.className='rank-row'+(i===0?' winner':'');
+    row.innerHTML = `
+      <div class="rank-num">${i+1}</div>
+      <div class="rank-details">
+        <div class="team-name-tag"><span class="dot" style="background:${t.color}"></span>${t.name}</div>
+        <div class="mini-stats" style="margin-top:6px;">
+          <span>Limpa: <b>${t.limpa}</b></span>
+          <span>Convencional: <b>${t.convencional}</b></span>
+          <span>Impacto: <b>${t.impacto}</b></span>
+        </div>
+      </div>
+      <div class="rank-score">${t.pontuacao} pts</div>`;
+    ranking.appendChild(row);
+  });
+  showScreen('screen-end');
+}
+
+/* init */
+renderSetup();
+</script>
 </body>
-
 </html>
